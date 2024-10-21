@@ -4,8 +4,8 @@ const bcrypt = require("bcrypt"); // For password hashing
 const { facultyModel } = require("../models/facultyModel"); // Faculty model
 const jwt = require("jsonwebtoken"); // For JWT authentication
 const JWT_FACULTY_PASSWORD = require("../config/config"); // Secret key for JWT
-const { timetableSchemaModel } = require("../models/timetableModel"); // Timetable model
-const { roomSchemaModel } = require("../models/roomModel"); // Room model
+const { timetableSchemaModel } = require("../models/timetableSchemaModel"); // Timetable model
+const { roomSchemaModel } = require("../models/roomSchemaModel"); // Room model
 
 /**
  * Handles faculty signup requests.
