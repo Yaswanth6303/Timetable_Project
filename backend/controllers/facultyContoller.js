@@ -6,6 +6,8 @@ const jwt = require("jsonwebtoken"); // For JWT authentication
 const JWT_FACULTY_PASSWORD = require("../config/config"); // Secret key for JWT
 const { timetableSchemaModel } = require("../models/timetableSchemaModel"); // Timetable model
 const { roomSchemaModel } = require("../models/roomSchemaModel"); // Room model
+const { masterTimetableModel } = require("../models/masterTimetableModel"); // Master Timetable Model
+const { facultyCourseSchemaModel } = require("../models/facultyCourseModel"); // FacultyCourse Model
 
 /**
  * Handles faculty signup requests.
@@ -79,7 +81,7 @@ async function facultySignup(req, res) {
 
 /**
  * Handles faculty sign-in requests.
- * 
+ *
  * @param {Object} req - The Express request object.
  * @param {Object} res - The Express response object.
  */
@@ -87,7 +89,7 @@ async function facultySignin(req, res) {
   // Define the schema for validating the request body using Zod.
   const requiredPayload = zod.object({
     email: zod.string().email(), // Email field must be a valid email string.
-    password: zod.string().min(4).max(20) // Password must be between 4 and 20 characters.
+    password: zod.string().min(4).max(20), // Password must be between 4 and 20 characters.
   });
 
   // Parse and validate the request body against the schema.
@@ -96,8 +98,7 @@ async function facultySignin(req, res) {
   // If validation fails, return a 411 status with an error message.
   if (!parsedPayload.success) {
     return res.status(411).json({
-      msg
-: "Improper Credentials",
+      msg: "Improper Credentials",
     });
   }
 
@@ -110,7 +111,7 @@ async function facultySignin(req, res) {
     // If the user is not found, return a 404 status with an error message.
     if (!foundUser) {
       return res.status(404).json({
-        msg: "User not found"
+        msg: "User not found",
       });
     }
 
@@ -166,7 +167,7 @@ async function viewOwnTimetable(req, res) {
     const facultyTimetable = await timetableSchemaModel
       .find({ facultyId })
       .populate("courseCode", "courseCode courseTitle")
-      .populate("facultyId", "facultyName") 
+      .populate("facultyId", "facultyName")
       .lean(); // Convert the Mongoose documents to plain JavaScript objects.
 
     // Format the timetable data for the response.
@@ -211,9 +212,219 @@ async function viewOwnTimetable(req, res) {
   }
 }
 
+/**
+ * Updates the profile of a faculty member.
+ *
+ * @param {object} req - The request object.
+ * @param {object} res - The response object.
+ * @returns {Promise<void>}
+ */
+async function updateMyProfile(req, res) {
+  // Get the faculty ID from the request object.
+  const facultyId = req.facultyId;
+
+  // Define the required payload schema using Zod.
+  const requiredPayload = zod.object({
+    firstName: zod.string().min(3).max(20).optional(),
+    lastName: zod.string().min(3).max(20).optional(),
+  });
+
+  // Parse and validate the request body against the schema.
+  const parsedPayload = requiredPayload.safeParse(req.body);
+
+  // If validation fails, return a 411 status with an error message.
+  if (!parsedPayload.success) {
+    return res.status(411).json({
+      msg: "Improper Credentials",
+    });
+  }
+
+  // Find the faculty member in the database using the faculty ID.
+  const foundFaculty = await facultyModel.findOne({ _id: facultyId });
+
+  // If the faculty member is not found, return a 404 status with an error message.
+  if (!foundFaculty) {
+    return res.status(404).json({
+      msg: "Faculty not found",
+    });
+  }
+
+  // Update the faculty member's first and last names if provided in the request body.
+  foundFaculty.firstName = parsedPayload.data.firstName || foundFaculty.firstName;
+  foundFaculty.lastName = parsedPayload.data.lastName || foundFaculty.lastName;
+
+  // Try to save the updated faculty member to the database.
+  try {
+    await foundFaculty.save();
+    // If the save is successful, return a 200 status with a success message.
+    return res.status(200).json({
+      message: "Profile updated successfully",
+    });
+  } catch (error) {
+    // If there is an error during the save, return a 500 status with an error message.
+    return res.status(500).json({
+      msg: "Error updating profile",
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Function to handle faculty password change requests.
+ * @param {Object} req - The request object containing facultyId and new password details.
+ * @param {Object} res - The response object used to send the response back to the client.
+ */
+async function changePassword(req, res) {
+  // Get the faculty ID from the request object
+  const facultyId = req.facultyId;
+
+  // Define a schema for validating the password change payload using Zod
+  const passwordSchema = zod.object({
+    oldPassword: zod.string().min(4).max(20), // Old password must be between 4 and 20 characters
+    newPassword: zod.string().min(4).max(20), // New password must be between 4 and 20 characters
+  });
+
+  // Parse and validate the request body against the schema
+  const parsedPayload = passwordSchema.safeParse(req.body);
+
+  // If validation fails, return an error response
+  if (!parsedPayload.success) {
+    return res.status(411).json({
+      msg: "Improper Credentials", // Indicate that the provided credentials are invalid
+    });
+  }
+
+  try {
+    // Find the faculty record in the database using the faculty ID
+    const foundFaculty = await facultyModel.findOne({ _id: facultyId });
+
+    // If faculty record is not found, return an error response
+    if (!foundFaculty) {
+      return res.status(404).json({
+        msg: "Faculty not found", // Indicate that the faculty was not found
+      });
+    }
+
+    // Compare the provided old password with the stored hashed password
+    const passwordMatch = await bcrypt.compare(
+      parsedPayload.data.oldPassword,
+      foundFaculty.password
+    );
+
+    // If passwords do not match, return an error response
+    if (!passwordMatch) {
+      return res.status(401).json({
+        msg: "Old password is incorrect", // Indicate that the old password is incorrect
+      });
+    }
+
+    // Hash the new password using bcrypt
+    const hashedNewPassword = await bcrypt.hash(
+      parsedPayload.data.newPassword,
+      10
+    );
+
+    // Update the faculty record with the new hashed password
+    await facultyModel.updateOne(
+      { _id: facultyId },
+      { password: hashedNewPassword }
+    );
+
+    // Return a success response
+    return res.status(200).json({
+      msg: "Password changed successfully", // Indicate that the password was changed successfully
+    });
+  } catch (error) {
+    // If any error occurs during the process, return an error response
+    return res.status(500).json({
+      msg: "Error changing password", // Indicate that there was an error changing the password
+      error: error.message, // Provide the error message for debugging
+    });
+  }
+}
+
+/**
+ * Retrieves the master timetable.
+ *
+ * @param {object} req - The request object.
+ * @param {object} res - The response object.
+ * @returns {object} - The master timetable data or an error message.
+ */
+async function viewMasterTimetable(req, res) {
+  try {
+    // Find all documents in the masterTimetableModel collection
+    const masterTimetable = await masterTimetableModel.find({});
+
+    // If no master timetable is found, return a 404 error
+    if (!masterTimetable) {
+      return res.status(404).json({
+        msg: "Master timetable not found",
+      });
+    }
+
+    // If master timetable is found, return a 200 success response with the data
+    return res.status(200).json({
+      message: "Master timetable retrieved successfully",
+      data: masterTimetable,
+    });
+  } catch (error) {
+    // If an error occurs during the process, return a 500 error
+    return res.status(500).json({
+      msg: "Error retrieving master timetable",
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Retrieves and returns the courses assigned to a specific faculty member.
+ *
+ * @param {Object} req - The request object containing the faculty member's ID.
+ * @param {Object} res - The response object used to send the response.
+ */
+async function viewAssignedCourses(req, res) {
+  try {
+    // Extract the faculty ID from the request object
+    const facultyId = req.facultyId;
+
+    // Find courses assigned to the faculty member using the facultyCourseSchemaModel
+    // and populate the 'courseCode' field with course code and title.
+    const assignedCourses = await facultyCourseSchemaModel
+      .find({ facultyId })
+      .populate("courseCode", "courseCode courseTitle")
+      .exec();
+
+    // If no assigned courses are found, return a 404 response
+    if (!assignedCourses || assignedCourses.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No courses assigned to this faculty member.",
+      });
+    }
+
+    // If assigned courses are found, return a 200 response with the courses
+    res.status(200).json({
+      success: true,
+      courses: assignedCourses,
+    });
+  } catch (error) {
+    // Handle any errors that occur during the process
+    console.error("Error fetching assigned courses:", error);
+    res.status(500).json({
+      success: false,
+      message: "An error occurred while fetching assigned courses.",
+      error: error.message,
+    });
+  }
+}
+
 // Export the function to make it accessible from other modules.
 module.exports = {
   facultySignup,
   facultySignin,
-  viewOwnTimetable
+  viewOwnTimetable,
+  updateMyProfile,
+  changePassword,
+  viewMasterTimetable,
+  viewAssignedCourses,
 };
