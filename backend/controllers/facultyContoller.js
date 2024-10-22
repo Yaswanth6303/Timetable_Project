@@ -7,7 +7,7 @@ const JWT_FACULTY_PASSWORD = require("../config/config"); // Secret key for JWT
 const { timetableSchemaModel } = require("../models/timetableSchemaModel"); // Timetable model
 const { roomSchemaModel } = require("../models/roomSchemaModel"); // Room model
 const { masterTimetableModel } = require("../models/masterTimetableModel"); // Master Timetable Model
-const { facultyCourseSchemaModel } = require("../models/facultyCourseModel"); // FacultyCourse Model
+const { facultyCourseSchemaModel } = require("../models/facultyCourseSchemaModel"); // FacultyCourse Model
 
 /**
  * Handles faculty signup requests.
