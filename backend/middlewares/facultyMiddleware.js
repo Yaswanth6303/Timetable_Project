@@ -2,7 +2,7 @@
 const jwt = require("jsonwebtoken");
 
 // Import the JWT secret key from the configuration file
-const JWT_FACULTY_PASSWORD = require("../config/config");
+const JWT_FACULTY_PASSWORD = process.env.JWT_FACULTY_PASSWORD;
 
 /**
  * Middleware function to authenticate faculty members.

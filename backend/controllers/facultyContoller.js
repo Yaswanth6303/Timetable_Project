@@ -3,10 +3,10 @@ const zod = require("zod"); // For schema validation
 const bcrypt = require("bcrypt"); // For password hashing
 const { facultyModel } = require("../models/facultyModel"); // Faculty model
 const jwt = require("jsonwebtoken"); // For JWT authentication
-const JWT_FACULTY_PASSWORD = require("../config/config"); // Secret key for JWT
+const JWT_FACULTY_PASSWORD = process.env.JWT_FACULTY_PASSWORD // Secret key for JWT
 const { timetableSchemaModel } = require("../models/timetableSchemaModel"); // Timetable model
 const { roomSchemaModel } = require("../models/roomSchemaModel"); // Room model
-const { masterTimetableModel } = require("../models/masterTimetableModel"); // Master Timetable Model
+const masterTimetableModel = require("../models/masterTimetableModel"); // Master Timetable Model
 const { facultyCourseSchemaModel } = require("../models/facultyCourseSchemaModel"); // FacultyCourse Model
 
 /**
@@ -97,7 +97,7 @@ async function facultySignin(req, res) {
 
   // If validation fails, return a 411 status with an error message.
   if (!parsedPayload.success) {
-    return res.status(411).json({
+    return res.status(400).json({
       msg: "Improper Credentials",
     });
   }
@@ -105,13 +105,13 @@ async function facultySignin(req, res) {
   try {
     // Find the user in the database based on the provided email.
     const foundUser = await facultyModel.findOne({
-      $or: [{ email: parsedPayload.data.email }],
+      email: parsedPayload.data.email,
     });
 
     // If the user is not found, return a 404 status with an error message.
     if (!foundUser) {
-      return res.status(404).json({
-        msg: "User not found",
+      return res.status(401).json({
+        msg: "Invalid credentials",
       });
     }
 
@@ -123,6 +123,12 @@ async function facultySignin(req, res) {
 
     // If the passwords match, generate a JWT and send it in the response.
     if (passwordMatch) {
+      if (!JWT_FACULTY_PASSWORD) {
+        return res.status(500).json({
+          msg: "JWT Secret not defined",
+        });
+      }
+
       const token = jwt.sign(
         {
           id: foundUser._id,
@@ -250,7 +256,8 @@ async function updateMyProfile(req, res) {
   }
 
   // Update the faculty member's first and last names if provided in the request body.
-  foundFaculty.firstName = parsedPayload.data.firstName || foundFaculty.firstName;
+  foundFaculty.firstName =
+    parsedPayload.data.firstName || foundFaculty.firstName;
   foundFaculty.lastName = parsedPayload.data.lastName || foundFaculty.lastName;
 
   // Try to save the updated faculty member to the database.
