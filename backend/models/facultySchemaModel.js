@@ -24,7 +24,7 @@ const facultySchema = new Schema({
 });
 
 // Create the Faculty model from the facultySchema
-const facultySchemaModel = mongoose.model("Faculty", facultySchema);
+const facultySchemaModel = mongoose.model("FacultyDetails", facultySchema);
 
 // Export the Faculty model to be used in other parts of the application
 module.exports = {

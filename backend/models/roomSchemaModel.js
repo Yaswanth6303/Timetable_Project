@@ -12,7 +12,7 @@ const roomSchema = new Schema({
         type: String, // Room number is a string
         required: true // Room number is required
     },
-    blockNumber: {
+    block: {
         type: String, // Block number is a string
         required: true // Block number is required
     },

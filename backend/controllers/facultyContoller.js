@@ -3,17 +3,9 @@ const zod = require("zod"); // For schema validation
 const bcrypt = require("bcrypt"); // For password hashing
 const { facultyModel } = require("../models/facultyModel"); // Faculty model
 const jwt = require("jsonwebtoken"); // For JWT authentication
-const JWT_FACULTY_PASSWORD = process.env.JWT_FACULTY_PASSWORD // Secret key for JWT
-const { timetableSchemaModel } = require("../models/timetableSchemaModel"); // Timetable model
-const { roomSchemaModel } = require("../models/roomSchemaModel"); // Room model
+const JWT_FACULTY_PASSWORD = process.env.JWT_FACULTY_PASSWORD; // Secret key for JWT
 const masterTimetableModel = require("../models/masterTimetableModel"); // Master Timetable Model
-const { facultyCourseSchemaModel } = require("../models/facultyCourseSchemaModel"); // FacultyCourse Model
 
-/**
- * Handles faculty signup requests.
- * @param {Object} req - The Express request object.
- * @param {Object} res - The Express response object.
- */
 async function facultySignup(req, res) {
   // Define a schema for validating the request body
   const requiredPayload = zod.object({
@@ -78,7 +70,6 @@ async function facultySignup(req, res) {
     message: "Internal Server Error",
   });
 }
-
 /**
  * Handles faculty sign-in requests.
  *
@@ -168,42 +159,36 @@ async function viewOwnTimetable(req, res) {
     // Get the faculty ID from the request object.
     const facultyId = req.facultyId;
 
-    // Find the faculty's timetable entries in the database.
-    // Populate the 'courseCode' and 'facultyId' fields with relevant information.
-    const facultyTimetable = await timetableSchemaModel
-      .find({ facultyId })
-      .populate("courseCode", "courseCode courseTitle")
-      .populate("facultyId", "facultyName")
+    // Find the faculty's timetable entries in the master timetable.
+    // Populate the 'courseTitle', 'faculty', and 'room' fields with relevant information.
+    const facultyTimetable = await masterTimetableModel
+      .find({ faculty: facultyId }) // Query the master timetable for the specific faculty
+      .populate("courseTitle", "courseCode courseTitle") // Populate course details from Course model
+      .populate("faculty", "facultyName") // Populate faculty details
+      .populate("room") // Populate room details
       .lean(); // Convert the Mongoose documents to plain JavaScript objects.
 
     // Format the timetable data for the response.
-    const formattedTimetable = await Promise.all(
-      facultyTimetable.map(async (entry) => {
-        // Find the room details for the current entry.
-        const roomDetails = await roomSchemaModel
-          .findOne({
-            roomNumber: entry.roomNumber,
-            blockNumber: entry.blockNumber,
-          })
-          .lean(); // Convert the Mongoose document to a plain JavaScript object.
-
-        // Return a formatted object for the current entry.
-        return {
-          day: entry.day,
-          timeSlot: entry.timeSlot,
-          batch: entry.batch,
-          graduationLevel: entry.graduationLevel,
-          school: entry.school,
-          program: entry.program,
-          semester: entry.semester,
-          courseCode: entry.courseCode.courseCode,
-          courseTitle: entry.courseCode.courseTitle,
-          block: entry.blockNumber,
-          roomNumber: entry.roomNumber,
-          roomType: roomDetails?.roomType || "Not specified", // Use room type from roomDetails if available, otherwise set to "Not specified".
-        };
-      })
-    );
+    const formattedTimetable = facultyTimetable.map((entry) => {
+      return {
+        day: entry.day,
+        timeSlot: entry.timeSlot,
+        batch: entry.batch,
+        graduationLevel: entry.graduationLevel,
+        school: entry.school,
+        program: entry.program,
+        semester: entry.semester,
+        courseCode: entry.courseTitle
+          ? entry.courseTitle.courseCode
+          : "Not specified",
+        courseTitle: entry.courseTitle
+          ? entry.courseTitle.courseTitle
+          : "Not specified",
+        block: entry.block,
+        roomNumber: entry.room ? entry.room.roomNumber : "Not specified",
+        roomType: entry.room ? entry.room.roomType : "Not specified",
+      };
+    });
 
     // Return the formatted timetable with a 200 status code.
     return res.status(200).json({
@@ -396,9 +381,10 @@ async function viewAssignedCourses(req, res) {
 
     // Find courses assigned to the faculty member using the facultyCourseSchemaModel
     // and populate the 'courseCode' field with course code and title.
-    const assignedCourses = await facultyCourseSchemaModel
-      .find({ facultyId })
-      .populate("courseCode", "courseCode courseTitle")
+    const assignedCourses = await masterTimetableModel
+      .find({ faculty: facultyId }) // Ensure the correct field is queried based on your schema
+      .populate("courseCode", "courseCode courseTitle") // Populate course details
+      .lean() // Convert to plain JavaScript objects
       .exec();
 
     // If no assigned courses are found, return a 404 response
@@ -409,15 +395,22 @@ async function viewAssignedCourses(req, res) {
       });
     }
 
+    // Format the assigned courses for the response
+    const formattedCourses = assignedCourses.map((course) => ({
+      courseCode: course.courseCode.courseCode, // Access the populated course code
+      courseTitle: course.courseCode.courseTitle, // Access the populated course title
+      // Add any other relevant fields from the assignedCourses schema if necessary
+    }));
+
     // If assigned courses are found, return a 200 response with the courses
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      courses: assignedCourses,
+      courses: formattedCourses,
     });
   } catch (error) {
     // Handle any errors that occur during the process
     console.error("Error fetching assigned courses:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "An error occurred while fetching assigned courses.",
       error: error.message,

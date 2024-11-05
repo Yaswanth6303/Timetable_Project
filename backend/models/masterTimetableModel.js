@@ -1,5 +1,5 @@
 // Import the mongoose library for MongoDB interaction
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 // Get the Schema class from mongoose
 const { Schema } = mongoose;
 
@@ -13,17 +13,22 @@ const masterTimetableSchema = new Schema({
     type: String, // Time slot for the class (e.g., 9:00 AM - 10:00 AM)
     required: true, // Time slot is a required field
   },
-  course: {  
+  courseTitle: {
     type: Schema.Types.ObjectId, // Reference to the Course model
     ref: "Course", // Name of the Course model to reference
     required: true, // Course is a required field
   },
-  faculty: { 
+  courseCode: {
+    type: Schema.Types.ObjectId, // Reference to the Course model
+    ref: "Course", // Name of the Course model to reference
+    required: true, // Course is a required field
+  },
+  faculty: {
     type: Schema.Types.ObjectId, // Reference to the Faculty model
     ref: "Faculty", // Name of the Faculty model to reference
     required: true, // Faculty is a required field
   },
-  room: {  
+  room: {
     type: Schema.Types.ObjectId, // Reference to the Room model
     ref: "Room", // Name of the Room model to reference
     required: true, // Room is a required field
@@ -38,7 +43,7 @@ const masterTimetableSchema = new Schema({
   },
   graduationLevel: {
     type: String, // Graduation level (Undergraduate or Postgraduate)
-    enum: ['UG', 'PG'], // Allowed values for graduation level
+    enum: ["UG", "PG"], // Allowed values for graduation level
     required: true, // Graduation level is a required field
   },
   program: {
@@ -48,15 +53,14 @@ const masterTimetableSchema = new Schema({
   semester: {
     type: String, // Semester or term (e.g., Fall 2023, Spring 2024)
     required: true, // Semester is a required field
-  },
-  courseTitle: {  
-    type: String, // Title of the course
-    required: true, // Course title is a required field
-  },
+  }
 });
 
 // Create the MasterTimetable model from the schema
-const masterTimetableModel = mongoose.model("MasterTimetable", masterTimetableSchema);
+const masterTimetableModel = mongoose.model(
+  "MasterTimetable",
+  masterTimetableSchema
+);
 
 // Export the MasterTimetable model to be used in other parts of the application
 module.exports = masterTimetableModel;
